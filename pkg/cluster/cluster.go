@@ -57,6 +57,7 @@ type clusterEvent struct {
 type Config struct {
 	PVProvisioner  string
 	ServiceAccount string
+	ClusterDomain  string
 	s3config.S3Context
 
 	KubeCli kubernetes.Interface
@@ -326,7 +327,7 @@ func (c *Cluster) run(stopC <-chan struct{}) {
 
 			// On controller restore, we could have "members == nil"
 			if rerr != nil || c.members == nil {
-				rerr = c.updateMembers(podsToMemberSet(running, c.cluster.Spec.SelfHosted, c.isSecureClient()))
+				rerr = c.updateMembers(podsToMemberSet(running, c.cluster.Spec.SelfHosted, c.isSecureClient(), c.config.ClusterDomain))
 				if rerr != nil {
 					c.logger.Errorf("failed to update members: %v", rerr)
 					break
@@ -395,10 +396,11 @@ func isBackupPolicyEqual(b1, b2 *spec.BackupPolicy) bool {
 
 func (c *Cluster) startSeedMember(recoverFromBackup bool) error {
 	m := &etcdutil.Member{
-		Name:         etcdutil.CreateMemberName(c.cluster.Metadata.Name, c.memberCounter),
-		Namespace:    c.cluster.Metadata.Namespace,
-		SecurePeer:   c.isSecurePeer(),
-		SecureClient: c.isSecureClient(),
+		Name:          etcdutil.CreateMemberName(c.cluster.Metadata.Name, c.memberCounter),
+		Namespace:     c.cluster.Metadata.Namespace,
+		SecurePeer:    c.isSecurePeer(),
+		SecureClient:  c.isSecureClient(),
+		ClusterDomain: c.config.ClusterDomain,
 	}
 	ms := etcdutil.NewMemberSet(m)
 	if err := c.createPod(ms, m, "new", recoverFromBackup); err != nil {
@@ -524,7 +526,10 @@ func (c *Cluster) updateMemberStatus(pods []*v1.Pod) {
 		if c.cluster.Spec.SelfHosted != nil {
 			url = fmt.Sprintf("http://%s:2379", pod.Status.PodIP)
 		} else {
-			m := &etcdutil.Member{Name: pod.Name, Namespace: pod.Namespace, SecureClient: c.isSecureClient()}
+			m := &etcdutil.Member{Name: pod.Name,
+				Namespace:     pod.Namespace,
+				ClusterDomain: c.config.ClusterDomain,
+				SecureClient:  c.isSecureClient()}
 			url = m.ClientAddr()
 		}
 		healthy, err := etcdutil.CheckHealth(url, c.tlsConfig)

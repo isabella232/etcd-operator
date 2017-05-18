@@ -48,6 +48,7 @@ type Backup struct {
 
 	clusterName   string
 	namespace     string
+	clusterDomain string
 	policy        spec.BackupPolicy
 	listenAddr    string
 	etcdTLSConfig *tls.Config
@@ -60,7 +61,7 @@ type Backup struct {
 	recentBackupsStatus []backupapi.BackupStatus
 }
 
-func New(kclient kubernetes.Interface, clusterName, ns string, sp spec.ClusterSpec, listenAddr string) (*Backup, error) {
+func New(kclient kubernetes.Interface, clusterName, ns, clusterDomain string, sp spec.ClusterSpec, listenAddr string) (*Backup, error) {
 	bdir := path.Join(constants.BackupMountDir, PVBackupV1, clusterName)
 	// We created not only backup dir and but also tmp dir under it.
 	// tmp dir is used to store intermediate snapshot files.
@@ -105,6 +106,7 @@ func New(kclient kubernetes.Interface, clusterName, ns string, sp spec.ClusterSp
 		kclient:       kclient,
 		clusterName:   clusterName,
 		namespace:     ns,
+		clusterDomain: clusterDomain,
 		policy:        *sp.Backup,
 		listenAddr:    listenAddr,
 		be:            be,
@@ -179,7 +181,7 @@ func (b *Backup) saveSnap(lastSnapRev int64) (int64, error) {
 		logrus.Warning(msg)
 		return lastSnapRev, fmt.Errorf(msg)
 	}
-	member, rev := getMemberWithMaxRev(pods, b.etcdTLSConfig)
+	member, rev := getMemberWithMaxRev(pods, b.etcdTLSConfig, b.clusterDomain)
 	if member == nil {
 		logrus.Warning("no reachable member")
 		return lastSnapRev, fmt.Errorf("no reachable member")
@@ -246,14 +248,15 @@ func (b *Backup) writeSnap(m *etcdutil.Member, rev int64) error {
 	return nil
 }
 
-func getMemberWithMaxRev(pods []*v1.Pod, tc *tls.Config) (*etcdutil.Member, int64) {
+func getMemberWithMaxRev(pods []*v1.Pod, tc *tls.Config, clusterDomain string) (*etcdutil.Member, int64) {
 	var member *etcdutil.Member
 	maxRev := int64(0)
 	for _, pod := range pods {
 		m := &etcdutil.Member{
-			Name:         pod.Name,
-			Namespace:    pod.Namespace,
-			SecureClient: tc != nil,
+			Name:          pod.Name,
+			Namespace:     pod.Namespace,
+			ClusterDomain: clusterDomain,
+			SecureClient:  tc != nil,
 		}
 		cfg := clientv3.Config{
 			Endpoints:   []string{m.ClientAddr()},

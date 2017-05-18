@@ -20,6 +20,7 @@ const (
 	DefaultDialTimeout      = 5 * time.Second
 	DefaultRequestTimeout   = 5 * time.Second
 	DefaultSnapshotInterval = 1800 * time.Second
+	DefaultClusterDomain    = "cluster.local."
 
 	DefaultBackupPodHTTPPort = 19999
 

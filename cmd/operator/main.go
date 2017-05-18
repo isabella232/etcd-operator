@@ -53,6 +53,7 @@ var (
 	awsConfig        string
 	s3Bucket         string
 	gcInterval       time.Duration
+	clusterDomain    string
 
 	chaosLevel int
 
@@ -78,6 +79,7 @@ func init() {
 	flag.IntVar(&chaosLevel, "chaos-level", -1, "DO NOT USE IN PRODUCTION - level of chaos injected into the etcd clusters created by the operator.")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 	flag.DurationVar(&gcInterval, "gc-interval", 10*time.Minute, "GC interval")
+	flag.StringVar(&clusterDomain, "cluster-domain", constants.DefaultClusterDomain, "Domain for this cluster.")
 	flag.Parse()
 
 	// Workaround for watching TPR resource.
@@ -196,6 +198,7 @@ func newControllerConfig() controller.Config {
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
 		PVProvisioner:  pvProvisioner,
+		ClusterDomain:  clusterDomain,
 		S3Context: s3config.S3Context{
 			AWSSecret: awsSecret,
 			AWSConfig: awsConfig,

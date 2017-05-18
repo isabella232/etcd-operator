@@ -23,6 +23,7 @@ import (
 	"github.com/coreos/etcd-operator/pkg/backup"
 	"github.com/coreos/etcd-operator/pkg/backup/env"
 	"github.com/coreos/etcd-operator/pkg/spec"
+	"github.com/coreos/etcd-operator/pkg/util/constants"
 	"github.com/coreos/etcd-operator/pkg/util/k8sutil"
 	"github.com/coreos/etcd-operator/version"
 
@@ -30,10 +31,11 @@ import (
 )
 
 var (
-	masterHost  string
-	clusterName string
-	listenAddr  string
-	namespace   string
+	masterHost    string
+	clusterName   string
+	clusterDomain string
+	listenAddr    string
+	namespace     string
 
 	printVersion bool
 )
@@ -41,6 +43,7 @@ var (
 func init() {
 	flag.StringVar(&masterHost, "master", "", "API Server addr, e.g. ' - NOT RECOMMENDED FOR PRODUCTION - http://127.0.0.1:8080'. Omit parameter to run in on-cluster mode and utilize the service account token.")
 	flag.StringVar(&clusterName, "etcd-cluster", "", "")
+	flag.StringVar(&clusterDomain, "cluster-domain", constants.DefaultClusterDomain, "Domain for this cluster.")
 	flag.StringVar(&listenAddr, "listen", "0.0.0.0:19999", "")
 	flag.BoolVar(&printVersion, "version", false, "Show version and quit")
 
@@ -69,7 +72,7 @@ func main() {
 	}
 
 	kclient := k8sutil.MustNewKubeClient()
-	bk, err := backup.New(kclient, clusterName, namespace, cs, listenAddr)
+	bk, err := backup.New(kclient, clusterName, namespace, clusterDomain, cs, listenAddr)
 	if err != nil {
 		logrus.Fatalf("failed to create backup sidecar: %v", err)
 	}

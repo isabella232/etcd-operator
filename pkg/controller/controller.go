@@ -76,6 +76,8 @@ type Config struct {
 	Namespace      string
 	ServiceAccount string
 	PVProvisioner  string
+	ClusterDomain  string
+
 	s3config.S3Context
 	KubeCli kubernetes.Interface
 }
@@ -240,6 +242,7 @@ func (c *Controller) makeClusterConfig() cluster.Config {
 		PVProvisioner:  c.PVProvisioner,
 		ServiceAccount: c.Config.ServiceAccount,
 		S3Context:      c.S3Context,
+		ClusterDomain:  c.ClusterDomain,
 
 		KubeCli: c.KubeCli,
 	}

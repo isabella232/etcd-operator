@@ -21,6 +21,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/coreos/etcd-operator/pkg/util/constants"
 )
 
 type Member struct {
@@ -39,10 +41,23 @@ type Member struct {
 
 	SecurePeer   bool
 	SecureClient bool
+
+	// ClusterDomain is the domain under which DNS entries will be added
+	ClusterDomain string
+}
+
+func (m *Member) clusterDomain() string {
+	if len(m.ClusterDomain) < 1 {
+		return constants.DefaultClusterDomain
+	}
+	if !strings.HasSuffix(m.ClusterDomain, ".") {
+		return fmt.Sprintf("%s.", m.ClusterDomain)
+	}
+	return m.ClusterDomain
 }
 
 func (m *Member) fqdn() string {
-	return fmt.Sprintf("%s.%s.%s.svc.cluster.local", m.Name, clusterNameFromMemberName(m.Name), m.Namespace)
+	return fmt.Sprintf("%s.%s.%s.svc.%s", m.Name, clusterNameFromMemberName(m.Name), m.Namespace, m.clusterDomain())
 }
 
 func (m *Member) ClientAddr() string {

@@ -17,7 +17,6 @@ package cluster
 import (
 	"errors"
 
-	"github.com/coreos/etcd-operator/pkg/spec"
 	"github.com/coreos/etcd-operator/pkg/util/constants"
 	"github.com/coreos/etcd-operator/pkg/util/etcdutil"
 	"github.com/coreos/etcd-operator/pkg/util/k8sutil"
@@ -40,21 +39,35 @@ func (c *Cluster) reconcile(pods []*v1.Pod) error {
 	}()
 
 	sp := c.cluster.Spec
-	running := podsToMemberSet(pods, c.cluster.Spec.SelfHosted, c.isSecureClient())
+	running := podsToMemberSet(pods, c.cluster.Spec.SelfHosted, c.isSecureClient(), c.config.ClusterDomain)
 	if !running.IsEqual(c.members) || c.members.Size() != sp.Size {
 		return c.reconcileMembers(running)
 	}
 
-	if needUpgrade(pods, sp) {
+	if c.needUpgrade(pods) {
 		c.status.UpgradeVersionTo(sp.Version)
 
-		m := pickOneOldMember(pods, sp.Version)
+		m := c.pickOneOldMember(pods)
 		return c.upgradeOneMember(m.Name)
 	}
 
 	c.status.SetVersion(sp.Version)
 	c.status.SetReadyCondition()
 
+	return nil
+}
+
+func (c *Cluster) needUpgrade(pods []*v1.Pod) bool {
+	return len(pods) == c.cluster.Spec.Size && c.pickOneOldMember(pods) != nil
+}
+
+func (c *Cluster) pickOneOldMember(pods []*v1.Pod) *etcdutil.Member {
+	for _, pod := range pods {
+		if k8sutil.GetEtcdVersion(pod) == c.cluster.Spec.Version {
+			continue
+		}
+		return &etcdutil.Member{Name: pod.Name, Namespace: pod.Namespace, ClusterDomain: c.config.ClusterDomain}
+	}
 	return nil
 }
 
@@ -128,10 +141,11 @@ func (c *Cluster) addOneMember() error {
 
 	newMemberName := etcdutil.CreateMemberName(c.cluster.Metadata.Name, c.memberCounter)
 	newMember := &etcdutil.Member{
-		Name:         newMemberName,
-		Namespace:    c.cluster.Metadata.Namespace,
-		SecurePeer:   c.isSecurePeer(),
-		SecureClient: c.isSecureClient(),
+		Name:          newMemberName,
+		Namespace:     c.cluster.Metadata.Namespace,
+		ClusterDomain: c.config.ClusterDomain,
+		SecurePeer:    c.isSecurePeer(),
+		SecureClient:  c.isSecureClient(),
 	}
 	ctx, _ := context.WithTimeout(context.Background(), constants.DefaultRequestTimeout)
 	resp, err := etcdcli.MemberAdd(ctx, []string{newMember.PeerURL()})
@@ -227,18 +241,4 @@ func (c *Cluster) disasterRecovery(left etcdutil.MemberSet) error {
 		}
 	}
 	return c.recover()
-}
-
-func needUpgrade(pods []*v1.Pod, cs spec.ClusterSpec) bool {
-	return len(pods) == cs.Size && pickOneOldMember(pods, cs.Version) != nil
-}
-
-func pickOneOldMember(pods []*v1.Pod, newVersion string) *etcdutil.Member {
-	for _, pod := range pods {
-		if k8sutil.GetEtcdVersion(pod) == newVersion {
-			continue
-		}
-		return &etcdutil.Member{Name: pod.Name, Namespace: pod.Namespace}
-	}
-	return nil
 }

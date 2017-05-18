@@ -54,3 +54,23 @@ func TestMemberSetIsEqual(t *testing.T) {
 		}
 	}
 }
+
+func TestMemberFqdn(t *testing.T) {
+	tests := []struct {
+		m    *Member
+		want string
+	}{{
+		m:    &Member{Name: "cluster-000", Namespace: "foo"},
+		want: "cluster-000.cluster.foo.svc.cluster.local.",
+	}, {
+		m:    &Member{Name: "cluster-000", Namespace: "foo", ClusterDomain: "abc.local"},
+		want: "cluster-000.cluster.foo.svc.abc.local.",
+	}}
+
+	for i, tt := range tests {
+		val := tt.m.fqdn()
+		if val != tt.want {
+			t.Errorf("#%d: get=%s, want=%s", i, val, tt.want)
+		}
+	}
+}
