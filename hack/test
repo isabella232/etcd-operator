@@ -66,7 +66,7 @@ function fmt_pass {
 }
 
 function build_pass {
-	IMAGE=$OPERATOR_IMAGE hack/build/operator/build
+	DOCKER_BUILD="$OPERATOR_DOCKER_BUILD" IMAGE=$OPERATOR_IMAGE hack/build/operator/build
 }
 
 function e2e_pass {

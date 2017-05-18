@@ -19,12 +19,14 @@ if ! which go > /dev/null; then
 	exit 1
 fi
 
-if ! which docker > /dev/null; then
-	echo "docker needs to be installed"
-	exit 1
-fi
+if [ "$DOCKER_BUILD" != "no" ]; then
+	if ! which docker > /dev/null; then
+		echo "docker needs to be installed"
+		exit 1
+	fi
 
-: ${IMAGE:?"Need to set IMAGE, e.g. gcr.io/coreos-k8s-scale-testing/etcd-operator"}
+	: ${IMAGE:?"Need to set IMAGE, e.g. gcr.io/coreos-k8s-scale-testing/etcd-operator"}
+fi
 
 GIT_SHA=`git rev-parse --short HEAD || echo "GitNotFound"`
 
@@ -40,6 +42,8 @@ go_ldflags="-X ${ldKVPairs} -X ${gitHash}"
 go_build operator
 go_build backup
 
-docker build --tag "${IMAGE}" -f hack/build/operator/Dockerfile . 1>/dev/null
+if [ "$DOCKER_BUILD" != "no" ]; then
+	docker build --tag "${IMAGE}" -f hack/build/operator/Dockerfile . 1>/dev/null
 # For gcr users, do "gcloud docker -a" to have access.
-docker push "${IMAGE}" 1>/dev/null
+	docker push "${IMAGE}" 1>/dev/null
+fi

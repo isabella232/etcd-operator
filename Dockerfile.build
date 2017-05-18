@@ -1,0 +1,20 @@
+FROM golang:1.8
+LABEL cibuild.context-stream=tar
+
+# this tells the etcd-operator build script not to build and push the image
+# since their build pipeline and ours are quite different
+ENV DOCKER_BUILD=no
+ENV IMAGE=dummy
+
+RUN go get github.com/Masterminds/glide \
+    && go install github.com/Masterminds/glide
+
+WORKDIR /go/src/github.com/coreos/etcd-operator
+
+COPY . .
+# only install deps if vendor is missing
+RUN test -d vendor || glide install --strip-vendor
+RUN go test -v -race $(go list ./pkg/...)
+RUN hack/build/operator/build
+
+CMD tar -cf - Dockerfile.release _output/bin/etcd-operator _output/bin/etcd-backup
